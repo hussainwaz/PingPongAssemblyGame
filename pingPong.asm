@@ -56,14 +56,13 @@ getScreenLocation:
 	
 movePaddleLeft:
 	pusha
-	cmp word [isPlayerATurn], 1
-	;here move playerA paddle in 0th row Left by 1 cell
+	
+	cmp word [cs:isPlayerATurn], 1	;here move playerA paddle in 0th row Left by 1 cell
 	je moveALeft
-	cmp word [isPlayerBTurn], 1
-	;here move playerB paddle in 24th row Left by 1 cell
+	cmp word [cs:isPlayerBTurn], 1	;here move playerB paddle in 24th row Left by 1 cell
 	je moveBLeft
 	jmp endF
-moveALeft:
+moveALeft:	
 	mov ax, 0xb800
 	mov es, ax
 	mov di, 3840
@@ -75,8 +74,9 @@ moveLeft1:
 	push es
 	pop ds
 	mov si, 3842
-	mov cx, 78
+	mov cx, 79
 	rep movsw
+	mov di, 3998	
 	mov word [es:di], 0x0720
 
 	jmp endF
@@ -94,8 +94,9 @@ moveLeft2:
 	push es
 	pop ds
 	mov si, 2
-	mov cx, 78
+	mov cx, 79
 	rep movsw
+	mov di, 158
 	mov word [es:di], 0x0720
 	jmp endF
 	
@@ -107,13 +108,10 @@ endF
 movePaddleRight:
 	pusha
 
-	cmp word [isPlayerATurn], 1
-	; here move playerB paddle in 24th row Right by 1 cel
-	jmp movARight
-	cmp word [isPlayerBTurn], 1
-	
-	; here move playerA paddle in 0th row Right by 1 cell
-	jmp movBRight
+	cmp word [cs:isPlayerATurn], 1	; here move playerB paddle in 24th row Right by 1 cel
+	je movARight
+	cmp word [cs:isPlayerBTurn], 1 ; here move playerA paddle in 0th row Right by 1 cell
+	je movBRight
 	jmp endFr
 	
 movBRight:
@@ -128,11 +126,12 @@ movRight2:
 	push es
 	pop ds
 	mov si, 156
-	mov cx, 78
+	mov cx, 79
 	std
 	rep movsw
 	
 	mov word [es:di], 0x0720
+	
 	jmp endFr
 	
 movARight:
@@ -147,7 +146,7 @@ moveRight3:
 	push es
 	pop ds
 	mov si, 3996
-	mov cx, 78
+	mov cx, 79
 	std
 	rep movsw
 	
@@ -186,9 +185,6 @@ nomatch:
 	
 drawScreen:
 	pusha
-	push ds
-	push cs
-	pop ds
 ;drawing PlayerA Paddle
 	mov ax, 30 ; x position
 	mov bx, 0 ;y position
@@ -209,8 +205,6 @@ drawScreen:
 	push bx
 	call getScreenLocation
 	mov di, ax
-	; mov bx, 0xb800
-	; mov es, bx
 	mov cx, 20
 	mov ax, 0x7020
 	rep stosw
@@ -223,32 +217,36 @@ showBall:
 	push bx
 	call getScreenLocation
 	mov di, ax
-	mov word [ballLocation], di
+	mov word [cs:ballLocation], di
 	mov word [es:di], 0x072A
 	rep stosw
-	pop ds
 	popa
 	ret
 	
 	
 setTurns:
-	cmp word [ballLocation], 1920
-	jbe setATurn
-	mov word [isPlayerBTurn], 1
-	mov word [isPlayerATurn], 0
+	cmp word [cs:ballMovingUp], 1
+	je setBTurn
+	cmp word [cs:ballMovingDown], 1
+	je setATurn
+	
 	jmp return
+setBTurn:
+	mov word [cs:isPlayerBTurn], 1
+	mov word [cs:isPlayerATurn], 0
+	jmp return
+	
 setATurn:
-	mov word [isPlayerATurn], 1
-	mov word [isPlayerBTurn], 0	
+	mov word [cs:isPlayerATurn], 1
+	mov word [cs:isPlayerBTurn], 0	
+	jmp return
+	
 return:
 	ret
 	
 	
 gameRunner:
 	pusha
-	push ds
-	push cs
-	pop ds
 	
 	mov ax, 0xb800
 	mov es, ax
@@ -260,49 +258,53 @@ gameRunner:
 	
 	;initially ball location will be 3760
 	;when it will hit first row [160-218] move it down diagnally Right
-	cmp word [ballMovingUp], 1
+	cmp word [cs:ballMovingUp], 1
 	je ballWasMovingUp
 	jmp ballWasMovingDown
 	
 ballWasMovingUp:
-	cmp word [ballLocation], 218
+	cmp word [cs:ballLocation], 318
 	jbe moveDownRight
 	jmp upRight
 
 ballWasMovingDown:
-	cmp word [ballLocation], 3680
-	jbe moveDownRight
-	jmp upRight
+	cmp word [cs:ballLocation], 3680
+	jge upRight
+	jmp moveDownRight
 
 
 moveDownRight:
-	mov word [ballMovingDown], 1
-	mov word [ballMovingUp], 0
-	mov di, [ballLocation]
+	mov word [cs:ballMovingDown], 1
+	mov word [cs:isPlayerATurn], 1
+	mov word [cs:isPlayerBTurn], 0
+	mov word [cs:ballMovingUp], 0
+	mov di, [cs:ballLocation]
 	mov word [es:di], 0x0720
-	add word [ballLocation], 162
+	add word [cs:ballLocation], 162
 	call setTurns
 	
-	mov di, [ballLocation]
+	mov di, [cs:ballLocation]
 	mov word [es:di], 0x072A
 	
 	jmp EndF1
 	
 upRight:
-	mov word [ballMovingDown], 0
-	mov word [ballMovingUp], 1
-	mov di, [ballLocation]
+	mov word [cs:ballMovingDown], 0
+	mov word [cs:ballMovingUp], 1
+	mov word [cs:isPlayerBTurn], 1
+	mov word [cs:isPlayerATurn], 0
+	
+	mov di, [cs:ballLocation]
 	mov word [es:di], 0x0720
-	sub word [ballLocation], 158
+	sub word [cs:ballLocation], 158
 	call setTurns
 	
-	mov di, [ballLocation]
+	mov di, [cs:ballLocation]
 	mov word [es:di], 0x072A
 	
 EndF1:
 	mov al, 0x20
 	out 0x20, al
-	pop ds
 	popa
 	iret
 start:
