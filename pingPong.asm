@@ -4,6 +4,12 @@ jmp start
 isPlayerATurn:dw 0
 isPlayerBTurn:dw 0
 ballLocation:dw 0
+ballMovingUp: dw 1
+ballMovingDown: dw 0
+
+oldTimer:dd 0
+oldKeyBoard:dd 0
+
 clrScr:
 ; subroutine to clear the screen
 clrscr: push es
@@ -56,7 +62,7 @@ movePaddleLeft:
 	cmp word [isPlayerBTurn], 1
 	;here move playerB paddle in 24th row Left by 1 cell
 	je moveBLeft
-
+	jmp endF
 moveALeft:
 	mov ax, 0xb800
 	mov es, ax
@@ -87,7 +93,7 @@ moveBLeft:
 moveLeft2:
 	push es
 	pop ds
-	mov si, 3842
+	mov si, 2
 	mov cx, 78
 	rep movsw
 	mov word [es:di], 0x0720
@@ -100,15 +106,59 @@ endF
 	
 movePaddleRight:
 	pusha
+
 	cmp word [isPlayerATurn], 1
-	; here move playerA paddle in 0th row Right by 1 cell
-	
+	; here move playerB paddle in 24th row Right by 1 cel
+	jmp movARight
 	cmp word [isPlayerBTurn], 1
-	; here move playerB paddle in 24th row Right by 1 cell
 	
+	; here move playerA paddle in 0th row Right by 1 cell
+	jmp movBRight
+	jmp endFr
+	
+movBRight:
+	mov ax, 0xb800
+	mov es, ax
+	mov di, 158
+	cmp word [es:di], 0x7020
+	jne movRight2
+	jmp endFr
+
+movRight2:
+	push es
+	pop ds
+	mov si, 156
+	mov cx, 78
+	std
+	rep movsw
+	
+	mov word [es:di], 0x0720
+	jmp endFr
+	
+movARight:
+	mov ax, 0xb800
+	mov es, ax
+	mov di, 3998
+	cmp word [es:di], 0x7020
+	jne moveRight3
+	jmp endFr
+
+moveRight3:
+	push es
+	pop ds
+	mov si, 3996
+	mov cx, 78
+	std
+	rep movsw
+	
+	mov word [es:di], 0x0720
+	jmp endFr
+	
+		
+endFr:
+
 	popa
 	ret
-	
 	; keyboard interrupt service routine
 kbisr:
 	push ax
@@ -125,6 +175,7 @@ nextcmp:
 	cmp al, 0x4D ; is the key right Arrow
 	jne nomatch ; no, leave interrupt routine
 	;here move paddle right
+	call movePaddleRight
 nomatch:
 	mov al, 0x20
 	out 0x20, al ; send EOI to PIC
@@ -135,7 +186,9 @@ nomatch:
 	
 drawScreen:
 	pusha
-		
+	push ds
+	push cs
+	pop ds
 ;drawing PlayerA Paddle
 	mov ax, 30 ; x position
 	mov bx, 0 ;y position
@@ -173,8 +226,11 @@ showBall:
 	mov word [ballLocation], di
 	mov word [es:di], 0x072A
 	rep stosw
+	pop ds
 	popa
 	ret
+	
+	
 setTurns:
 	cmp word [ballLocation], 1920
 	jbe setATurn
@@ -183,12 +239,17 @@ setTurns:
 	jmp return
 setATurn:
 	mov word [isPlayerATurn], 1
-	mov word [isPlayerBTurn], 0
-	
+	mov word [isPlayerBTurn], 0	
 return:
 	ret
+	
+	
 gameRunner:
 	pusha
+	push ds
+	push cs
+	pop ds
+	
 	mov ax, 0xb800
 	mov es, ax
 	;here moving ball
@@ -199,20 +260,37 @@ gameRunner:
 	
 	;initially ball location will be 3760
 	;when it will hit first row [160-218] move it down diagnally Right
+	cmp word [ballMovingUp], 1
+	je ballWasMovingUp
+	jmp ballWasMovingDown
+	
+ballWasMovingUp:
 	cmp word [ballLocation], 218
 	jbe moveDownRight
 	jmp upRight
+
+ballWasMovingDown:
+	cmp word [ballLocation], 3680
+	jbe moveDownRight
+	jmp upRight
+
+
 moveDownRight:
+	mov word [ballMovingDown], 1
+	mov word [ballMovingUp], 0
 	mov di, [ballLocation]
 	mov word [es:di], 0x0720
-	add word [ballLocation], 158
+	add word [ballLocation], 162
 	call setTurns
 	
 	mov di, [ballLocation]
 	mov word [es:di], 0x072A
 	
 	jmp EndF1
+	
 upRight:
+	mov word [ballMovingDown], 0
+	mov word [ballMovingUp], 1
 	mov di, [ballLocation]
 	mov word [es:di], 0x0720
 	sub word [ballLocation], 158
@@ -224,6 +302,7 @@ upRight:
 EndF1:
 	mov al, 0x20
 	out 0x20, al
+	pop ds
 	popa
 	iret
 start:
@@ -231,6 +310,20 @@ start:
 	call drawScreen
 	xor ax, ax
 	mov es, ax
+	
+	;saving old interups
+	mov ax, [es:8*4]
+	mov [oldTimer], ax
+	
+	mov ax, [es:8*4 + 2]
+	mov [oldTimer + 2], ax
+	
+	mov ax, [es:9*4]
+	mov [oldKeyBoard], ax
+	mov ax, [es:9*4 + 2]
+	mov [oldKeyBoard + 2], ax
+	
+	
 	cli
 	mov word [es:8*4], gameRunner
 	mov [es:8*4+2], cs
