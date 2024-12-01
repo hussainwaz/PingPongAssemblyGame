@@ -4,8 +4,16 @@ jmp start
 isPlayerATurn:dw 0
 isPlayerBTurn:dw 0
 ballLocation:dw 0
+ballLocAdd: dw 0
 ballMovingUp: dw 1
 ballMovingDown: dw 0
+
+; new variables for 4 directions
+ballMovingUpRight: dw 1
+ballMovingUpLeft: dw 0
+ballMovingDownRight: dw 0
+ballMovingDownLeft: dw 0
+
 
 oldTimer:dd 0
 oldKeyBoard:dd 0
@@ -54,6 +62,65 @@ getScreenLocation:
 	pop bp
 	ret 4
 	
+	
+collisionWithLeftSide:
+	push bx
+	
+	mov ax, [cs:ballLocation];screen location
+	mov bx, 160
+	mov dx, 0
+	div bx
+	cmp dx, 0
+	je collsionL
+	mov ax, 0
+	jmp retC1
+collsionL:
+	mov ax, 1
+	
+retC1:
+	pop bx
+	ret
+	
+; collisionWithRightSide:
+	; push bx
+	; mov ax, [cs:ballLocation];screen location
+	; mov bx, 158
+	; mov dx, 0
+	
+	; div bx
+	; cmp dx, 0
+	; je collsionR
+	; mov ax, 0
+	; jmp retC2
+; collsionR:
+	; mov ax, 1
+	
+; retC2:
+	; pop bx
+	; ret
+collisionWithRightSide:
+    push bx
+    push dx
+    mov dx, 0
+    mov ax, [cs:ballLocation] 
+    mov bx, 2 
+    div bx
+    mov bx, 80
+    div bx
+    cmp dx, 79
+    je collsionR
+    
+    mov ax, 0
+    jmp retC2
+
+collsionR:
+    mov ax, 1
+    
+retC2:
+    pop dx
+    pop bx
+    ret
+
 movePaddleLeft:
 	pusha
 	
@@ -182,6 +249,31 @@ nomatch:
 	pop ax
 	iret 
 
+
+setNextLocation:
+	cmp word [cs:ballMovingDownLeft], 1
+	je movDL
+	cmp word [cs:ballMovingDownRight], 1
+	je movDR
+	
+	cmp word [cs:ballMovingUpLeft], 1
+	je movUL	
+	cmp word [cs:ballMovingUpRight], 1
+	je movUR
+movDL:
+	mov word [cs:ballLocAdd], 158
+	jmp retSetBallLoc
+movDR:
+	mov word [cs:ballLocAdd], 162
+	jmp retSetBallLoc
+movUL:
+	mov word [cs:ballLocAdd], 162
+	jmp retSetBallLoc
+movUR:
+	mov word [cs:ballLocAdd], 158
+	jmp retSetBallLoc
+retSetBallLoc:
+	ret
 	
 drawScreen:
 	pusha
@@ -225,9 +317,13 @@ showBall:
 	
 	
 setTurns:
-	cmp word [cs:ballMovingUp], 1
+	cmp word [cs:ballMovingUpLeft], 1
 	je setBTurn
-	cmp word [cs:ballMovingDown], 1
+	cmp word [cs:ballMovingUpRight], 1
+	je setBTurn
+	cmp word [cs:ballMovingDownLeft], 1
+	je setATurn
+	cmp word [cs:ballMovingDownRight], 1
 	je setATurn
 	
 	jmp return
@@ -245,6 +341,59 @@ return:
 	ret
 	
 	
+checkCollision:
+	pusha
+	call collisionWithLeftSide
+	cmp ax, 1
+	je leftColl
+	call collisionWithRightSide
+	cmp ax, 1
+	je rightColl
+	jmp retColl
+leftColl:
+	cmp word [cs:ballMovingDownLeft], 1
+	je moveBallDownRight1
+	cmp word [cs:ballMovingUpLeft], 1
+	je moveBallUpRight1
+	
+moveBallDownRight1:
+	mov word [cs:ballMovingDownRight], 1
+	mov word [cs:ballMovingDownLeft], 0
+	mov word [cs:ballMovingUpLeft], 0
+	mov word [cs:ballMovingUpRight], 0
+	call setNextLocation
+	jmp retColl
+moveBallUpRight1:
+	mov word [cs:ballMovingDownRight], 0
+	mov word [cs:ballMovingDownLeft], 0
+	mov word [cs:ballMovingUpLeft], 0
+	mov word [cs:ballMovingUpRight], 1
+	call setNextLocation
+	jmp retColl
+rightColl:
+	cmp word [cs:ballMovingDownRight], 1
+	je moveBallDownLeft1
+	cmp word [cs:ballMovingUpRight], 1
+	je moveBallUpLeft1
+	
+moveBallDownLeft1:
+	mov word [cs:ballMovingDownRight], 0
+	mov word [cs:ballMovingDownLeft], 1
+	mov word [cs:ballMovingUpLeft], 0
+	mov word [cs:ballMovingUpRight], 0
+	call setNextLocation
+	jmp retColl
+moveBallUpLeft1:
+	mov word [cs:ballMovingDownRight], 0
+	mov word [cs:ballMovingDownLeft], 0
+	mov word [cs:ballMovingUpLeft], 1
+	mov word [cs:ballMovingUpRight], 0
+	call setNextLocation
+	jmp retColl
+
+retColl:
+	popa
+	ret
 gameRunner:
 	pusha
 	
@@ -258,29 +407,61 @@ gameRunner:
 	
 	;initially ball location will be 3760
 	;when it will hit first row [160-218] move it down diagnally Right
-	cmp word [cs:ballMovingUp], 1
-	je ballWasMovingUp
-	jmp ballWasMovingDown
+	call checkCollision
+	cmp word [cs:ballMovingUpRight], 1
+	je ballWasMovingUpRight
 	
-ballWasMovingUp:
+	cmp word [cs:ballMovingUpLeft], 1
+	je ballWasMovingUpLeft
+	
+	cmp word [cs:ballMovingDownLeft], 1
+	je ballWasMovingDownLeft
+	
+	cmp word [cs:ballMovingDownRight], 1
+	je ballWasMovingDownRight
+	
+	
+ballWasMovingUpRight:
 	cmp word [cs:ballLocation], 318
 	jbe moveDownRight
 	jmp upRight
+	
+ballWasMovingUpLeft:
+	cmp word [cs:ballLocation], 318
+	jbe moveDownLeft
+	jmp upLeft
 
-ballWasMovingDown:
+ballWasMovingDownRight:
 	cmp word [cs:ballLocation], 3680
-	jge upRight
+	jge upRightPortal
 	jmp moveDownRight
+	
+ballWasMovingDownLeft:
+	cmp word [cs:ballLocation], 3680
+	jge upLeftPortal
+	jmp moveDownLeft
 
-
+upLeftPortal:
+	jmp upLeft
+	
+upRightPortal:
+	jmp upRight
+	
 moveDownRight:
-	mov word [cs:ballMovingDown], 1
+	mov word [cs:ballMovingDownRight], 1
+	mov word [cs:ballMovingDownLeft], 0
+	mov word [cs:ballMovingUpLeft], 0
+	mov word [cs:ballMovingUpRight], 0
+	
 	mov word [cs:isPlayerATurn], 1
 	mov word [cs:isPlayerBTurn], 0
-	mov word [cs:ballMovingUp], 0
 	mov di, [cs:ballLocation]
 	mov word [es:di], 0x0720
-	add word [cs:ballLocation], 162
+	call setNextLocation
+	push ax
+	mov ax, [cs:ballLocAdd]
+	add word [cs:ballLocation], ax
+	pop ax
 	call setTurns
 	
 	mov di, [cs:ballLocation]
@@ -288,19 +469,74 @@ moveDownRight:
 	
 	jmp EndF1
 	
+moveDownLeft:
+	mov word [cs:ballMovingDownRight], 0
+	mov word [cs:ballMovingDownLeft], 1
+	mov word [cs:ballMovingUpLeft], 0
+	mov word [cs:ballMovingUpRight], 0
+	
+	mov word [cs:isPlayerATurn], 1
+	mov word [cs:isPlayerBTurn], 0
+	mov di, [cs:ballLocation]
+	mov word [es:di], 0x0720
+	call setNextLocation
+	push ax
+	mov ax, [cs:ballLocAdd]
+	add word [cs:ballLocation], ax
+	pop ax
+	call setTurns
+	
+	mov di, [cs:ballLocation]
+	mov word [es:di], 0x072A
+	
+	jmp EndF1
+	
+	
+	
 upRight:
-	mov word [cs:ballMovingDown], 0
-	mov word [cs:ballMovingUp], 1
+	mov word [cs:ballMovingDownRight], 0
+	mov word [cs:ballMovingDownLeft], 0
+	mov word [cs:ballMovingUpLeft], 0
+	mov word [cs:ballMovingUpRight], 1
+	
 	mov word [cs:isPlayerBTurn], 1
 	mov word [cs:isPlayerATurn], 0
 	
 	mov di, [cs:ballLocation]
 	mov word [es:di], 0x0720
-	sub word [cs:ballLocation], 158
+	call setNextLocation
+	push ax
+	mov ax, [cs:ballLocAdd]
+	sub word [cs:ballLocation], ax
+	pop ax
 	call setTurns
 	
 	mov di, [cs:ballLocation]
 	mov word [es:di], 0x072A
+	jmp EndF1
+	
+upLeft:
+	mov word [cs:ballMovingDownRight], 0
+	mov word [cs:ballMovingDownLeft], 0
+	mov word [cs:ballMovingUpLeft], 1
+	mov word [cs:ballMovingUpRight], 0
+	
+	mov word [cs:isPlayerBTurn], 1
+	mov word [cs:isPlayerATurn], 0
+	
+	mov di, [cs:ballLocation]
+	mov word [es:di], 0x0720
+	call setNextLocation
+	push ax
+	mov ax, [cs:ballLocAdd]
+	sub word [cs:ballLocation], ax
+	pop ax
+	call setTurns
+	
+	mov di, [cs:ballLocation]
+	mov word [es:di], 0x072A
+	jmp EndF1
+	
 	
 EndF1:
 	mov al, 0x20
@@ -313,17 +549,17 @@ start:
 	xor ax, ax
 	mov es, ax
 	
-	;saving old interups
-	mov ax, [es:8*4]
-	mov [oldTimer], ax
+	; ;saving old interups
+	; mov ax, [es:8*4]
+	; mov [cs:oldTimer], ax
 	
-	mov ax, [es:8*4 + 2]
-	mov [oldTimer + 2], ax
+	; mov ax, [es:8*4 + 2]
+	; mov [oldTimer + 2], ax
 	
-	mov ax, [es:9*4]
-	mov [oldKeyBoard], ax
-	mov ax, [es:9*4 + 2]
-	mov [oldKeyBoard + 2], ax
+	; mov ax, [es:9*4]
+	; mov [oldKeyBoard], ax
+	; mov ax, [es:9*4 + 2]
+	; mov [oldKeyBoard + 2], ax
 	
 	
 	cli
