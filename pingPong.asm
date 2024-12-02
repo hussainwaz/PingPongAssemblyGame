@@ -1,6 +1,9 @@
 [org 0x0100]
 jmp start
 
+oldTimer: dd 0
+oldKeyBoard: dd 0
+
 isPlayerATurn: dw 0
 isPlayerBTurn: dw 0
 ballLocation: dw 0
@@ -18,61 +21,53 @@ ballMovingDownLeft: dw 0
 playerAScore: db 0
 playerBScore: db 0
 
-printnum:
-	push bp
-	mov bp, sp
+aWon:db 'Player A Won', 0
+bWon:db 'Player B Won', 0
+;delay
+bigDelay:
+	push cx
+	mov cx, 0x005F ; change the values to increase delay time
+	delay_loop11:
+	push cx
+	mov cx, 0xFFFF
+	delay_loop2:
+	loop delay_loop2
+	pop cx
+	loop delay_loop11
+	pop cx
+	ret
+	
+smallDelay:
+	push cx
+	mov cx, 0x000F ; change the values to increase delay time
+	delay_loop12:
+	push cx
+	mov cx, 0xFFFF
+	delay_loop22:
+	loop delay_loop22
+	pop cx
+	loop delay_loop12
+	pop cx
+	ret
+	
+; subroutine to clear the screen
+clrScr
 	push es
 	push ax
-	push bx
 	push cx
-	push dx
 	push di
 	mov ax, 0xb800
 	mov es, ax ; point es to video base
-	mov ax, [bp+4] ; load number in ax
-	mov bx, 10 ; use base 10 for division
-	mov cx, 0 ; initialize count of digits
-nextdigit:
-	mov dx, 0 ; zero upper half of dividend
-	div bx ; divide by 10
-	add dl, 0x30 ; convert digit into ascii value
-	push dx ; save ascii value on stack
-	inc cx ; increment count of values
-	cmp ax, 0 ; is the quotient zero
-	jnz nextdigit ; if no divide it again
-	mov di, 500 ; point di to top left column
-nextpos:
-	pop dx ; remove a digit from the stack
-	mov dh, 0x07 ; use normal attribute
-	mov [es:di], dx ; print char on screen
-	add di, 2 ; move to next screen location
-	loop nextpos ; repeat for all digits on stack
+	xor di, di ; point di to top left column
+	mov ax, 0x0720 ; space char in normal attribute
+	mov cx, 2000 ; number of screen locations
+	cld ; auto increment mode
+	rep stosw ; clear the whole screen
 	pop di
-	pop dx
 	pop cx
-	pop bx
 	pop ax
 	pop es
-	pop bp
-	ret 2
-clrScr:
-; subroutine to clear the screen
-clrscr: push es
-push ax
-push cx
-push di
-mov ax, 0xb800
-mov es, ax ; point es to video base
-xor di, di ; point di to top left column
-mov ax, 0x0720 ; space char in normal attribute
-mov cx, 2000 ; number of screen locations
-cld ; auto increment mode
-rep stosw ; clear the whole screen
-pop di
-pop cx
-pop ax
-pop es
-ret
+	ret
 ; helper subroutines
 
 	
@@ -459,24 +454,60 @@ gameRunner:
 	
 	
 ballWasMovingUpRight:
-	cmp word [cs:ballLocation], 318
-	jbe moveDownRight
-	jmp upRight
-	
+    cmp word [cs:ballLocation], 318
+    jbe checkPaddleCollisionUpRight
+    jmp upRightPortal
+
+checkPaddleCollisionUpRight:
+    mov di, [cs:ballLocation]
+    sub di, [cs:ballLocAdd] ; Move to the location where the ball would collide with the paddle
+    cmp word [es:di], 0x7020 ; Check if it matches paddle
+    je moveDownRight ; Continue normal ball movement if paddle is hit
+    
+	call printScore ; Call your function for missed collision
+    jmp EndF1
+
 ballWasMovingUpLeft:
-	cmp word [cs:ballLocation], 318
-	jbe moveDownLeftPortal
-	jmp upLeft
+    cmp word [cs:ballLocation], 318
+    jbe checkPaddleCollisionUpLeft
+    jmp upLeftPortal
+
+checkPaddleCollisionUpLeft:
+    mov di, [cs:ballLocation]
+    sub di, [cs:ballLocAdd] ; Move to the location where the ball would collide with the paddle
+    cmp word [es:di], 0x7020 ; Check if it matches paddle
+    je moveDownLeftPortal ; Continue normal ball movement if paddle is hit
+    
+	call printScore ; Call your function for missed collision
+    jmp EndF1
 
 ballWasMovingDownRight:
-	cmp word [cs:ballLocation], 3680
-	jge upRightPortal
-	jmp moveDownRight
+    cmp word [cs:ballLocation], 3680
+    jge checkPaddleCollisionDownRight
+    jmp moveDownRight
+
+checkPaddleCollisionDownRight:
+    mov di, [cs:ballLocation]
+    add di, [cs:ballLocAdd] ; Move to the location where the ball would collide with the paddle
+    cmp word [es:di], 0x7020 ; Check if it matches paddle
+    je upRightPortal ; Continue normal ball movement if paddle is hit
 	
+    call printScore ; Call your function for missed collision
+    jmp EndF1
+
 ballWasMovingDownLeft:
-	cmp word [cs:ballLocation], 3680
-	jge upLeftPortal
-	jmp moveDownLeft
+    cmp word [cs:ballLocation], 3680
+    jge checkPaddleCollisionDownLeft
+    jmp moveDownLeftPortal
+
+checkPaddleCollisionDownLeft:
+    mov di, [cs:ballLocation]
+    add di, [cs:ballLocAdd] ; Move to the location where the ball would collide with the paddle
+    cmp word [es:di], 0x7020 ; Check if it matches paddle
+    je upLeftPortal ; Continue normal ball movement if paddle is hit
+   
+	call printScore ; Call your function for missed collision
+    jmp EndF1
 
 upLeftPortal:
 	jmp upLeft
@@ -588,6 +619,34 @@ EndF1:
 	
 	
 printScore:
+	pusha
+	call resetInterupts
+	cmp word [cs:isPlayerATurn], 1
+	je addBScore
+	cmp word [cs:isPlayerBTurn], 1
+	je addAScore
+	jmp retScore
+	
+addAScore:
+	inc word [cs:playerAScore]
+	jmp showScore
+addBScore:
+	inc word [cs:playerBScore]
+	
+	jmp showScore
+	
+showScore:
+	mov di, [cs:ballLocation]
+	mov word [es:di], 0x0720
+	mov word [cs:ballLocation], 3760
+	mov word [cs:isPlayerATurn], 0
+	mov word [cs:isPlayerBTurn], 1
+	mov word [cs:ballMovingUpRight], 1
+	mov word [cs:ballMovingUpLeft], 0
+	mov word [cs:ballMovingDownRight], 0
+	mov word [cs:ballMovingDownLeft], 0
+	
+	
 	mov ax, 36; column(x)
 	push ax
 	mov ax, 12; row (y)
@@ -686,7 +745,7 @@ printScore:
 	mov ax, 0x0720  ; ' ' (space)
     mov [es:di], ax
     add di, 2
-	mov byte al, [playerAScore]  ; Player A Score
+	mov byte al, [cs:playerAScore]  ; Player A Score
 	add al, 48; convert to asscii
     mov [es:di], ax
     add di, 2 
@@ -739,42 +798,121 @@ printScore:
 	mov ax, 0x0720  ; ' ' (space)
     mov [es:di], ax
     add di, 2
-	mov byte al, [playerBScore]  ; Player B Score
+	mov byte al, [cs:playerBScore]  ; Player B Score
 	add al, 48; convert to asscii
 	
     mov [es:di], ax
     add di, 2 
-    ret
-
-
-start:
+	
+	call bigDelay
 	call clrScr
 	call drawScreen
+	call smallDelay
+
+	
+	 
+retScore:
+	popa
+	call setInterupts
+    ret
+
+setInterupts:
+	pusha
 	xor ax, ax
 	mov es, ax
-	
-	; ;saving old interups
-	; mov ax, [es:8*4]
-	; mov [cs:oldTimer], ax
-	
-	; mov ax, [es:8*4 + 2]
-	; mov [oldTimer + 2], ax
-	
-	; mov ax, [es:9*4]
-	; mov [oldKeyBoard], ax
-	; mov ax, [es:9*4 + 2]
-	; mov [oldKeyBoard + 2], ax
-	
-	
 	cli
 	mov word [es:8*4], gameRunner
 	mov [es:8*4+2], cs
 	mov word [es:9*4], kbisr ; store offset at n*4
 	mov [es:9*4+2], cs ; store segment at n*4+2
 	sti
+	popa
+	ret
+	
+resetInterupts:
+	cli
+
+	xor ax, ax
+	mov es, ax
+	mov ax, [cs:oldTimer]
+	mov bx, [cs:oldTimer + 2]	
+	mov cx, [cs:oldKeyBoard]
+	mov dx, [cs:oldKeyBoard + 2]
+
+	mov word [es:8*4], ax	
+	mov [es:8*4+2], bx
+	mov word [es:9*4], cx
+	mov [es:9*4+2], dx
+	sti
+	ret
+	
+start:
+	call clrScr
+	call drawScreen
+	call smallDelay
+	
+	xor ax, ax
+	mov es, ax
+	
+	;saving old interups
+	cli
+	mov ax, [es:8*4]
+	mov [cs:oldTimer], ax
+	
+	mov ax, [es:8*4 + 2]
+	mov [cs:oldTimer + 2], ax
+	
+	mov ax, [es:9*4]
+	mov [cs:oldKeyBoard], ax
+	mov ax, [es:9*4 + 2]
+	mov [cs:oldKeyBoard + 2], ax
+	sti
+	
+	call setInterupts
 	
 label1:
+	cmp word [cs:playerAScore], 5
+	je endA
+	cmp word [cs:playerBScore], 5
+	je endB
 	jmp label1
+	
+endA:
+	
+	call resetInterupts
+	push cs
+	pop ds
+	call clrScr
+	
+	mov si, aWon
+	mov ax, 0xb800
+	mov es, ax
+	mov cx, 12
+	mov di, 1994
+	jmp show
+	
+endB:
+	
+	call resetInterupts
+	push cs
+	pop ds
+	call clrScr
+	mov si, bWon
+	mov ax, 0xb800
+	mov es, ax
+	mov cx, 12
+	mov di, 1994
+	
+show:
+	mov ah, 0x07
+	mov al, [si]
+	inc si
+	mov [es:di], ax
+	add di, 2	
+	loop show
+	call smallDelay
+		
 end:
+	call resetInterupts
 	mov ax, 0x4c00
 	int 0x21
