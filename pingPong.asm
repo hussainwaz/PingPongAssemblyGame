@@ -1,10 +1,10 @@
 [org 0x0100]
 jmp start
 
-isPlayerATurn:dw 0
-isPlayerBTurn:dw 0
-ballLocation:dw 0
-ballLocAdd: dw 0
+isPlayerATurn: dw 0
+isPlayerBTurn: dw 0
+ballLocation: dw 0
+ballLocAdd: dw 158
 ballMovingUp: dw 1
 ballMovingDown: dw 0
 
@@ -15,9 +15,46 @@ ballMovingDownRight: dw 0
 ballMovingDownLeft: dw 0
 
 
-oldTimer:dd 0
-oldKeyBoard:dd 0
+playerAScore: db 0
+playerBScore: db 0
 
+printnum:
+	push bp
+	mov bp, sp
+	push es
+	push ax
+	push bx
+	push cx
+	push dx
+	push di
+	mov ax, 0xb800
+	mov es, ax ; point es to video base
+	mov ax, [bp+4] ; load number in ax
+	mov bx, 10 ; use base 10 for division
+	mov cx, 0 ; initialize count of digits
+nextdigit:
+	mov dx, 0 ; zero upper half of dividend
+	div bx ; divide by 10
+	add dl, 0x30 ; convert digit into ascii value
+	push dx ; save ascii value on stack
+	inc cx ; increment count of values
+	cmp ax, 0 ; is the quotient zero
+	jnz nextdigit ; if no divide it again
+	mov di, 500 ; point di to top left column
+nextpos:
+	pop dx ; remove a digit from the stack
+	mov dh, 0x07 ; use normal attribute
+	mov [es:di], dx ; print char on screen
+	add di, 2 ; move to next screen location
+	loop nextpos ; repeat for all digits on stack
+	pop di
+	pop dx
+	pop cx
+	pop bx
+	pop ax
+	pop es
+	pop bp
+	ret 2
 clrScr:
 ; subroutine to clear the screen
 clrscr: push es
@@ -428,7 +465,7 @@ ballWasMovingUpRight:
 	
 ballWasMovingUpLeft:
 	cmp word [cs:ballLocation], 318
-	jbe moveDownLeft
+	jbe moveDownLeftPortal
 	jmp upLeft
 
 ballWasMovingDownRight:
@@ -446,6 +483,9 @@ upLeftPortal:
 	
 upRightPortal:
 	jmp upRight
+	
+moveDownLeftPortal:
+	jmp moveDownLeft
 	
 moveDownRight:
 	mov word [cs:ballMovingDownRight], 1
@@ -494,6 +534,7 @@ moveDownLeft:
 	
 	
 upRight:
+	
 	mov word [cs:ballMovingDownRight], 0
 	mov word [cs:ballMovingDownLeft], 0
 	mov word [cs:ballMovingUpLeft], 0
@@ -516,6 +557,7 @@ upRight:
 	jmp EndF1
 	
 upLeft:
+
 	mov word [cs:ballMovingDownRight], 0
 	mov word [cs:ballMovingDownLeft], 0
 	mov word [cs:ballMovingUpLeft], 1
@@ -543,6 +585,168 @@ EndF1:
 	out 0x20, al
 	popa
 	iret
+	
+	
+printScore:
+	mov ax, 36; column(x)
+	push ax
+	mov ax, 12; row (y)
+	push ax
+	call getScreenLocation
+	
+    mov di, ax
+	
+    mov ax, 0xb800
+    mov es, ax    
+     
+    mov ax, 0x072D  ; '-'
+    mov [es:di], ax
+    add di, 2
+	mov ax, 0x072D  ; '-'
+    mov [es:di], ax
+    add di, 2
+	mov ax, 0x072D  ; '-'
+    mov [es:di], ax
+    add di, 2
+	
+    mov ax, 0x0753  ; 'S'
+    mov [es:di], ax
+    add di, 2 
+    
+    mov ax, 0x0763  ; 'c'
+    mov [es:di], ax
+    add di, 2
+    
+    mov ax, 0x076F  ; 'o'
+    mov [es:di], ax
+    add di, 2
+    
+    mov ax, 0x0772  ; 'r'
+    mov [es:di], ax
+    add di, 2
+    
+    mov ax, 0x0765  ; 'e'
+    mov [es:di], ax
+    add di, 2
+    
+    mov ax, 0x072D  ; '-'
+    mov [es:di], ax
+    add di, 2
+	mov ax, 0x072D  ; '-'
+    mov [es:di], ax
+    add di, 2
+	mov ax, 0x072D  ; '-'
+    mov [es:di], ax
+    add di, 2
+	
+	mov ax, 34; column(x)
+	push ax
+	mov ax, 13; row (y)
+	push ax
+	call getScreenLocation
+	mov di, ax
+	
+	;here print Player A: 
+	mov ax, 0x0750  ; 'P'
+    mov [es:di], ax
+    add di, 2 
+    
+    mov ax, 0x076C  ; 'l'
+    mov [es:di], ax
+    add di, 2
+    
+    mov ax, 0x0761  ; 'a'
+    mov [es:di], ax
+    add di, 2
+    
+    mov ax, 0x0779  ; 'y'
+    mov [es:di], ax
+    add di, 2
+    
+    mov ax, 0x0765  ; 'e'
+    mov [es:di], ax
+    add di, 2
+    
+    mov ax, 0x0772  ; 'r'
+    mov [es:di], ax
+    add di, 2
+    
+    
+    mov ax, 0x0720  ; ' ' (space to separate "A")
+    mov [es:di], ax
+    add di, 2
+    
+    mov ax, 0x0741  ; 'A'
+    mov [es:di], ax
+    add di, 2 
+	 
+    mov ax, 0x073A  ; ':'
+    mov [es:di], ax
+    add di, 2
+	mov ax, 0x0720  ; ' ' (space)
+    mov [es:di], ax
+    add di, 2
+	mov byte al, [playerAScore]  ; Player A Score
+	add al, 48; convert to asscii
+    mov [es:di], ax
+    add di, 2 
+
+	mov ax, 34; column(x)
+	push ax
+	mov ax, 14; row (y)
+	push ax
+	call getScreenLocation
+	mov di, ax
+	
+
+	;here print Player B: 
+	mov ax, 0x0750  ; 'P'
+    mov [es:di], ax
+    add di, 2 
+    
+    mov ax, 0x076C  ; 'l'
+    mov [es:di], ax
+    add di, 2
+    
+    mov ax, 0x0761  ; 'a'
+    mov [es:di], ax
+    add di, 2
+    
+    mov ax, 0x0779  ; 'y'
+    mov [es:di], ax
+    add di, 2
+    
+    mov ax, 0x0765  ; 'e'
+    mov [es:di], ax
+    add di, 2
+    
+    mov ax, 0x0772  ; 'r'
+    mov [es:di], ax
+    add di, 2
+    
+    
+    mov ax, 0x0720  ; ' ' (space to separate "A")
+    mov [es:di], ax
+    add di, 2
+    
+    mov ax, 0x0742  ; 'B'
+    mov [es:di], ax
+    add di, 2 
+	 
+    mov ax, 0x073A  ; ':'
+    mov [es:di], ax
+    add di, 2
+	mov ax, 0x0720  ; ' ' (space)
+    mov [es:di], ax
+    add di, 2
+	mov byte al, [playerBScore]  ; Player B Score
+	add al, 48; convert to asscii
+	
+    mov [es:di], ax
+    add di, 2 
+    ret
+
+
 start:
 	call clrScr
 	call drawScreen
