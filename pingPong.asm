@@ -1,6 +1,6 @@
 [org 0x0100]
 jmp start
-
+terMinateGame: dw 0
 oldTimer: dd 0
 oldKeyBoard: dd 0
 
@@ -23,6 +23,7 @@ playerBScore: db 0
 
 aWon:db 'Player A Won', 0
 bWon:db 'Player B Won', 0
+
 ;delay
 bigDelay:
 	push cx
@@ -38,6 +39,7 @@ bigDelay:
 	ret
 	
 smallDelay:
+
 	push cx
 	mov cx, 0x000F ; change the values to increase delay time
 	delay_loop12:
@@ -48,6 +50,7 @@ smallDelay:
 	pop cx
 	loop delay_loop12
 	pop cx
+	
 	ret
 	
 ; subroutine to clear the screen
@@ -620,7 +623,6 @@ EndF1:
 	
 printScore:
 	pusha
-	call resetInterupts
 	cmp word [cs:isPlayerATurn], 1
 	je addBScore
 	cmp word [cs:isPlayerBTurn], 1
@@ -629,12 +631,27 @@ printScore:
 	
 addAScore:
 	inc word [cs:playerAScore]
+	mov al, [cs:playerAScore]
+	mov ah, 0
+	cmp word ax, 5
+	je endAWon
 	jmp showScore
 addBScore:
 	inc word [cs:playerBScore]
-	
+	mov al, [cs:playerBScore]
+	mov ah, 0
+	cmp word ax, 5
+	je endBWon
 	jmp showScore
 	
+endAWon:
+	mov word [cs:terMinateGame], 1
+	jmp retScore
+endBWon:
+	mov word [cs:terMinateGame], 1
+	jmp retScore
+
+
 showScore:
 	mov di, [cs:ballLocation]
 	mov word [es:di], 0x0720
@@ -808,12 +825,9 @@ showScore:
 	call clrScr
 	call drawScreen
 	call smallDelay
-
-	
 	 
 retScore:
 	popa
-	call setInterupts
     ret
 
 setInterupts:
@@ -846,6 +860,40 @@ resetInterupts:
 	sti
 	ret
 	
+	
+	
+endA:
+	push cs
+	pop ds
+	call clrScr
+	
+	mov si, aWon
+	mov ax, 0xb800
+	mov es, ax
+	mov cx, 12
+	mov di, 1994
+	jmp show
+	
+	
+endB:
+	push cs
+	pop ds
+	call clrScr
+	mov si, bWon
+	mov ax, 0xb800
+	mov es, ax
+	mov cx, 12
+	mov di, 1994
+	
+show:
+	mov ah, 0x07
+	mov al, [si]
+	inc si
+	mov [es:di], ax
+	add di, 2	
+	loop show
+	call smallDelay
+	jmp end2
 start:
 	call clrScr
 	call drawScreen
@@ -871,48 +919,37 @@ start:
 	call setInterupts
 	
 label1:
-	cmp word [cs:playerAScore], 5
-	je endA
-	cmp word [cs:playerBScore], 5
-	je endB
+	mov ax, [cs:terMinateGame]
+	cmp ax, 1
+	je end
 	jmp label1
 	
-endA:
+
 	
-	call resetInterupts
-	push cs
-	pop ds
-	call clrScr
-	
-	mov si, aWon
-	mov ax, 0xb800
-	mov es, ax
-	mov cx, 12
-	mov di, 1994
-	jmp show
-	
-endB:
-	
-	call resetInterupts
-	push cs
-	pop ds
-	call clrScr
-	mov si, bWon
-	mov ax, 0xb800
-	mov es, ax
-	mov cx, 12
-	mov di, 1994
-	
-show:
-	mov ah, 0x07
-	mov al, [si]
-	inc si
-	mov [es:di], ax
-	add di, 2	
-	loop show
-	call smallDelay
-		
 end:
-	call resetInterupts
+	cli
+
+	xor ax, ax
+	mov es, ax
+	mov ax, [cs:oldTimer]
+	mov bx, [cs:oldTimer + 2]	
+	mov cx, [cs:oldKeyBoard]
+	mov dx, [cs:oldKeyBoard + 2]
+
+	mov word [es:8*4], ax	
+	mov [es:8*4+2], bx
+	mov word [es:9*4], cx
+	mov [es:9*4+2], dx
+	mov al, [cs:playerAScore]
+	mov ah, 0
+	cmp ax, 5
+	je endA
+	mov al, [cs:playerBScore]
+	mov ah, 0
+	cmp ax, 5
+	je endB
+	sti
+
+end2:
 	mov ax, 0x4c00
 	int 0x21
