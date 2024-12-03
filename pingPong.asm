@@ -1,28 +1,30 @@
 [org 0x0100]
 jmp start
-terMinateGame: dw 0
+
+terMinateGame: dw 0 ; flag which tells if someone has won
 oldTimer: dd 0
 oldKeyBoard: dd 0
 
 isPlayerATurn: dw 0
 isPlayerBTurn: dw 0
+
 ballLocation: dw 0
 ballLocAdd: dw 158
-ballMovingUp: dw 1
-ballMovingDown: dw 0
 
-; new variables for 4 directions
-ballMovingUpRight: dw 1
-ballMovingUpLeft: dw 0
-ballMovingDownRight: dw 0
-ballMovingDownLeft: dw 0
 
+; 1 for ballMovingUpRight
+; 2 for ballMovingUpLeft
+; 3 for ballMovingDownRight
+; 4 for ballMovingDownLeft
+
+ballDirection: dw 1
 
 playerAScore: db 0
 playerBScore: db 0
 
 aWon:db 'Player A Won', 0
 bWon:db 'Player B Won', 0
+
 
 ;delay
 bigDelay:
@@ -39,7 +41,6 @@ bigDelay:
 	ret
 	
 smallDelay:
-
 	push cx
 	mov cx, 0x000F ; change the values to increase delay time
 	delay_loop12:
@@ -50,7 +51,6 @@ smallDelay:
 	pop cx
 	loop delay_loop12
 	pop cx
-	
 	ret
 	
 ; subroutine to clear the screen
@@ -73,11 +73,7 @@ clrScr
 	ret
 ; helper subroutines
 
-	
 ; sub routine to get the screen location
-;location = ( hypos(y) * 80 + epos(x) ) * 2
-; this subRoutine returns final answer in ax
-; coming stack : ret yPos xPost
 getScreenLocation:
 	push bp
 	mov bp, sp
@@ -97,7 +93,7 @@ getScreenLocation:
 	pop bp
 	ret 4
 	
-	
+; checks if ball has reached 0th column
 collisionWithLeftSide:
 	push bx
 	
@@ -116,23 +112,7 @@ retC1:
 	pop bx
 	ret
 	
-; collisionWithRightSide:
-	; push bx
-	; mov ax, [cs:ballLocation];screen location
-	; mov bx, 158
-	; mov dx, 0
-	
-	; div bx
-	; cmp dx, 0
-	; je collsionR
-	; mov ax, 0
-	; jmp retC2
-; collsionR:
-	; mov ax, 1
-	
-; retC2:
-	; pop bx
-	; ret
+; checks if ball has reached 79th column
 collisionWithRightSide:
     push bx
     push dx
@@ -155,6 +135,8 @@ retC2:
     pop dx
     pop bx
     ret
+
+; paddle movent
 
 movePaddleLeft:
 	pusha
@@ -257,9 +239,10 @@ moveRight3:
 	
 		
 endFr:
-
 	popa
 	ret
+	
+	
 	; keyboard interrupt service routine
 kbisr:
 	push ax
@@ -285,16 +268,19 @@ nomatch:
 	iret 
 
 
+; set how much we need to add or subtracr into ball location for next location
+
 setNextLocation:
-	cmp word [cs:ballMovingDownLeft], 1
+	cmp word [cs:ballDirection], 4
 	je movDL
-	cmp word [cs:ballMovingDownRight], 1
+	cmp word [cs:ballDirection], 3
 	je movDR
 	
-	cmp word [cs:ballMovingUpLeft], 1
-	je movUL	
-	cmp word [cs:ballMovingUpRight], 1
+	cmp word [cs:ballDirection], 2
+	je movUL
+	cmp word [cs:ballDirection], 1
 	je movUR
+
 movDL:
 	mov word [cs:ballLocAdd], 158
 	jmp retSetBallLoc
@@ -312,6 +298,7 @@ retSetBallLoc:
 	
 drawScreen:
 	pusha
+	
 ;drawing PlayerA Paddle
 	mov ax, 30 ; x position
 	mov bx, 0 ;y position
@@ -351,14 +338,15 @@ showBall:
 	ret
 	
 	
+; depending upon position set which player's turn it is 
 setTurns:
-	cmp word [cs:ballMovingUpLeft], 1
+	cmp word [cs:ballDirection], 2
 	je setBTurn
-	cmp word [cs:ballMovingUpRight], 1
+	cmp word [cs:ballDirection], 1
 	je setBTurn
-	cmp word [cs:ballMovingDownLeft], 1
+	cmp word [cs:ballDirection], 4
 	je setATurn
-	cmp word [cs:ballMovingDownRight], 1
+	cmp word [cs:ballDirection], 3
 	je setATurn
 	
 	jmp return
@@ -375,7 +363,7 @@ setATurn:
 return:
 	ret
 	
-	
+; checking collion with paddle
 checkCollision:
 	pusha
 	call collisionWithLeftSide
@@ -386,73 +374,61 @@ checkCollision:
 	je rightColl
 	jmp retColl
 leftColl:
-	cmp word [cs:ballMovingDownLeft], 1
+	cmp word [cs:ballDirection], 4
 	je moveBallDownRight1
-	cmp word [cs:ballMovingUpLeft], 1
+	cmp word [cs:ballDirection], 2
 	je moveBallUpRight1
 	
 moveBallDownRight1:
-	mov word [cs:ballMovingDownRight], 1
-	mov word [cs:ballMovingDownLeft], 0
-	mov word [cs:ballMovingUpLeft], 0
-	mov word [cs:ballMovingUpRight], 0
+	mov word [cs:ballDirection], 3
 	call setNextLocation
 	jmp retColl
+	
 moveBallUpRight1:
-	mov word [cs:ballMovingDownRight], 0
-	mov word [cs:ballMovingDownLeft], 0
-	mov word [cs:ballMovingUpLeft], 0
-	mov word [cs:ballMovingUpRight], 1
+	mov word [cs:ballDirection], 1
 	call setNextLocation
 	jmp retColl
+	
 rightColl:
-	cmp word [cs:ballMovingDownRight], 1
+	cmp word [cs:ballDirection], 3
 	je moveBallDownLeft1
-	cmp word [cs:ballMovingUpRight], 1
+	cmp word [cs:ballDirection], 1
 	je moveBallUpLeft1
 	
 moveBallDownLeft1:
-	mov word [cs:ballMovingDownRight], 0
-	mov word [cs:ballMovingDownLeft], 1
-	mov word [cs:ballMovingUpLeft], 0
-	mov word [cs:ballMovingUpRight], 0
+	mov word [cs:ballDirection], 4
 	call setNextLocation
 	jmp retColl
+	
 moveBallUpLeft1:
-	mov word [cs:ballMovingDownRight], 0
-	mov word [cs:ballMovingDownLeft], 0
-	mov word [cs:ballMovingUpLeft], 1
-	mov word [cs:ballMovingUpRight], 0
+	mov word [cs:ballDirection], 2
 	call setNextLocation
 	jmp retColl
-
+	
 retColl:
 	popa
 	ret
+	
+; timer interupt is hooked to this
+; this moves ball and handles ll collisions
 gameRunner:
 	pusha
 	
 	mov ax, 0xb800
 	mov es, ax
-	;here moving ball
 	
-	;checks for moving ball
-	;1- initially one row and one column up right direction
-	;2- after hitting player A row move ball back oppositely(right down diagnally)
 	
-	;initially ball location will be 3760
-	;when it will hit first row [160-218] move it down diagnally Right
 	call checkCollision
-	cmp word [cs:ballMovingUpRight], 1
+	cmp word [cs:ballDirection], 1
 	je ballWasMovingUpRight
 	
-	cmp word [cs:ballMovingUpLeft], 1
+	cmp word [cs:ballDirection], 2
 	je ballWasMovingUpLeft
 	
-	cmp word [cs:ballMovingDownLeft], 1
+	cmp word [cs:ballDirection], 4
 	je ballWasMovingDownLeft
 	
-	cmp word [cs:ballMovingDownRight], 1
+	cmp word [cs:ballDirection], 3
 	je ballWasMovingDownRight
 	
 	
@@ -522,10 +498,7 @@ moveDownLeftPortal:
 	jmp moveDownLeft
 	
 moveDownRight:
-	mov word [cs:ballMovingDownRight], 1
-	mov word [cs:ballMovingDownLeft], 0
-	mov word [cs:ballMovingUpLeft], 0
-	mov word [cs:ballMovingUpRight], 0
+	mov word [cs:ballDirection], 3
 	
 	mov word [cs:isPlayerATurn], 1
 	mov word [cs:isPlayerBTurn], 0
@@ -544,10 +517,7 @@ moveDownRight:
 	jmp EndF1
 	
 moveDownLeft:
-	mov word [cs:ballMovingDownRight], 0
-	mov word [cs:ballMovingDownLeft], 1
-	mov word [cs:ballMovingUpLeft], 0
-	mov word [cs:ballMovingUpRight], 0
+	mov word [cs:ballDirection], 4
 	
 	mov word [cs:isPlayerATurn], 1
 	mov word [cs:isPlayerBTurn], 0
@@ -568,12 +538,7 @@ moveDownLeft:
 	
 	
 upRight:
-	
-	mov word [cs:ballMovingDownRight], 0
-	mov word [cs:ballMovingDownLeft], 0
-	mov word [cs:ballMovingUpLeft], 0
-	mov word [cs:ballMovingUpRight], 1
-	
+	mov word [cs:ballDirection], 1
 	mov word [cs:isPlayerBTurn], 1
 	mov word [cs:isPlayerATurn], 0
 	
@@ -591,12 +556,7 @@ upRight:
 	jmp EndF1
 	
 upLeft:
-
-	mov word [cs:ballMovingDownRight], 0
-	mov word [cs:ballMovingDownLeft], 0
-	mov word [cs:ballMovingUpLeft], 1
-	mov word [cs:ballMovingUpRight], 0
-	
+	mov word [cs:ballDirection], 2	
 	mov word [cs:isPlayerBTurn], 1
 	mov word [cs:isPlayerATurn], 0
 	
@@ -658,23 +618,18 @@ showScore:
 	mov word [cs:ballLocation], 3760
 	mov word [cs:isPlayerATurn], 0
 	mov word [cs:isPlayerBTurn], 1
-	mov word [cs:ballMovingUpRight], 1
-	mov word [cs:ballMovingUpLeft], 0
-	mov word [cs:ballMovingDownRight], 0
-	mov word [cs:ballMovingDownLeft], 0
 	
+	mov word [cs:ballDirection], 1
 	
-	mov ax, 36; column(x)
+	mov ax, 33; column(x)
 	push ax
-	mov ax, 12; row (y)
+	mov ax, 10; row (y)
 	push ax
 	call getScreenLocation
 	
-    mov di, ax
-	
+    mov di, ax	
     mov ax, 0xb800
-    mov es, ax    
-     
+    mov es, ax         
     mov ax, 0x072D  ; '-'
     mov [es:di], ax
     add di, 2
@@ -715,9 +670,9 @@ showScore:
     mov [es:di], ax
     add di, 2
 	
-	mov ax, 34; column(x)
+	mov ax, 33; column(x)
 	push ax
-	mov ax, 13; row (y)
+	mov ax, 12; row (y)
 	push ax
 	call getScreenLocation
 	mov di, ax
@@ -767,9 +722,9 @@ showScore:
     mov [es:di], ax
     add di, 2 
 
-	mov ax, 34; column(x)
+	mov ax, 33; column(x)
 	push ax
-	mov ax, 14; row (y)
+	mov ax, 13; row (y)
 	push ax
 	call getScreenLocation
 	mov di, ax
@@ -845,7 +800,6 @@ setInterupts:
 	
 resetInterupts:
 	cli
-
 	xor ax, ax
 	mov es, ax
 	mov ax, [cs:oldTimer]
@@ -859,8 +813,7 @@ resetInterupts:
 	mov [es:9*4+2], dx
 	sti
 	ret
-	
-	
+		
 	
 endA:
 	push cs
@@ -894,6 +847,7 @@ show:
 	loop show
 	call smallDelay
 	jmp end2
+	
 start:
 	call clrScr
 	call drawScreen
