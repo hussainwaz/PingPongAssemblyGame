@@ -24,7 +24,9 @@ playerBScore: db 0
 
 aWon:db 'Player A Won', 0
 bWon:db 'Player B Won', 0
-
+scoreTxt:db '---- Score ----', 0
+pA:db 'Player A: ', 0
+pB:db 'Player B: ', 0
 
 ;delay
 bigDelay:
@@ -245,6 +247,7 @@ endFr:
 	
 	; keyboard interrupt service routine
 kbisr:
+
 	push ax
 	push es
 	mov ax, 0xb800
@@ -582,7 +585,14 @@ EndF1:
 	
 	
 printScore:
+	
+	push cs
+	pop ds
+	
 	pusha
+	
+	mov bh, 0x07
+	mov dh, 0x07
 	cmp word [cs:isPlayerATurn], 1
 	je addBScore
 	cmp word [cs:isPlayerBTurn], 1
@@ -590,6 +600,7 @@ printScore:
 	jmp retScore
 	
 addAScore:
+	mov bh, 0x0C
 	inc word [cs:playerAScore]
 	mov al, [cs:playerAScore]
 	mov ah, 0
@@ -597,6 +608,7 @@ addAScore:
 	je endAWon
 	jmp showScore
 addBScore:
+	mov dh, 0x0C
 	inc word [cs:playerBScore]
 	mov al, [cs:playerBScore]
 	mov ah, 0
@@ -621,7 +633,7 @@ showScore:
 	
 	mov word [cs:ballDirection], 1
 	
-	mov ax, 33; column(x)
+	mov ax, 31; column(x)
 	push ax
 	mov ax, 10; row (y)
 	push ax
@@ -630,45 +642,16 @@ showScore:
     mov di, ax	
     mov ax, 0xb800
     mov es, ax         
-    mov ax, 0x072D  ; '-'
-    mov [es:di], ax
-    add di, 2
-	mov ax, 0x072D  ; '-'
-    mov [es:di], ax
-    add di, 2
-	mov ax, 0x072D  ; '-'
-    mov [es:di], ax
-    add di, 2
+    mov cx, 15
 	
-    mov ax, 0x0753  ; 'S'
-    mov [es:di], ax
-    add di, 2 
-    
-    mov ax, 0x0763  ; 'c'
-    mov [es:di], ax
-    add di, 2
-    
-    mov ax, 0x076F  ; 'o'
-    mov [es:di], ax
-    add di, 2
-    
-    mov ax, 0x0772  ; 'r'
-    mov [es:di], ax
-    add di, 2
-    
-    mov ax, 0x0765  ; 'e'
-    mov [es:di], ax
-    add di, 2
-    
-    mov ax, 0x072D  ; '-'
-    mov [es:di], ax
-    add di, 2
-	mov ax, 0x072D  ; '-'
-    mov [es:di], ax
-    add di, 2
-	mov ax, 0x072D  ; '-'
-    mov [es:di], ax
-    add di, 2
+	mov si, scoreTxt
+showScoretxt:
+	mov ah, 0x0E
+	mov al, [si]
+	inc si
+	mov [es:di], ax
+	add di, 2	
+	loop showScoretxt
 	
 	mov ax, 33; column(x)
 	push ax
@@ -678,49 +661,19 @@ showScore:
 	mov di, ax
 	
 	;here print Player A: 
-	mov ax, 0x0750  ; 'P'
-    mov [es:di], ax
-    add di, 2 
-    
-    mov ax, 0x076C  ; 'l'
-    mov [es:di], ax
-    add di, 2
-    
-    mov ax, 0x0761  ; 'a'
-    mov [es:di], ax
-    add di, 2
-    
-    mov ax, 0x0779  ; 'y'
-    mov [es:di], ax
-    add di, 2
-    
-    mov ax, 0x0765  ; 'e'
-    mov [es:di], ax
-    add di, 2
-    
-    mov ax, 0x0772  ; 'r'
-    mov [es:di], ax
-    add di, 2
-    
-    
-    mov ax, 0x0720  ; ' ' (space to separate "A")
-    mov [es:di], ax
-    add di, 2
-    
-    mov ax, 0x0741  ; 'A'
-    mov [es:di], ax
-    add di, 2 
-	 
-    mov ax, 0x073A  ; ':'
-    mov [es:di], ax
-    add di, 2
-	mov ax, 0x0720  ; ' ' (space)
-    mov [es:di], ax
-    add di, 2
+	mov cx, 10
+	
+	mov si, pA
+showScoretxtA:
+	mov ah, bh
+	mov al, [si]
+	inc si
+	mov [es:di], ax
+	add di, 2	
+	loop showScoretxtA
 	mov byte al, [cs:playerAScore]  ; Player A Score
 	add al, 48; convert to asscii
     mov [es:di], ax
-    add di, 2 
 
 	mov ax, 33; column(x)
 	push ax
@@ -731,45 +684,16 @@ showScore:
 	
 
 	;here print Player B: 
-	mov ax, 0x0750  ; 'P'
-    mov [es:di], ax
-    add di, 2 
-    
-    mov ax, 0x076C  ; 'l'
-    mov [es:di], ax
-    add di, 2
-    
-    mov ax, 0x0761  ; 'a'
-    mov [es:di], ax
-    add di, 2
-    
-    mov ax, 0x0779  ; 'y'
-    mov [es:di], ax
-    add di, 2
-    
-    mov ax, 0x0765  ; 'e'
-    mov [es:di], ax
-    add di, 2
-    
-    mov ax, 0x0772  ; 'r'
-    mov [es:di], ax
-    add di, 2
-    
-    
-    mov ax, 0x0720  ; ' ' (space to separate "A")
-    mov [es:di], ax
-    add di, 2
-    
-    mov ax, 0x0742  ; 'B'
-    mov [es:di], ax
-    add di, 2 
-	 
-    mov ax, 0x073A  ; ':'
-    mov [es:di], ax
-    add di, 2
-	mov ax, 0x0720  ; ' ' (space)
-    mov [es:di], ax
-    add di, 2
+	mov cx, 10
+	
+	mov si, pB
+showScoretxtB:
+	mov ah, dh
+	mov al, [si]
+	inc si
+	mov [es:di], ax
+	add di, 2	
+	loop showScoretxtB
 	mov byte al, [cs:playerBScore]  ; Player B Score
 	add al, 48; convert to asscii
 	
@@ -836,10 +760,11 @@ endB:
 	mov ax, 0xb800
 	mov es, ax
 	mov cx, 12
-	mov di, 1994
+	mov di, 1988
 	
 show:
-	mov ah, 0x07
+	mov ah,	0x0E
+
 	mov al, [si]
 	inc si
 	mov [es:di], ax
