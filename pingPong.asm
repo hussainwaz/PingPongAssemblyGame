@@ -8,7 +8,7 @@ oldKeyBoard: dd 0
 isPlayerATurn: dw 0
 isPlayerBTurn: dw 0
 
-ballLocation: dw 0
+ballLocation: dw 3760
 ballLocAdd: dw 158
 
 
@@ -139,7 +139,8 @@ retC2:
     ret
 
 ; paddle movent
-
+; A is In Row 0
+; B is in Row 24
 movePaddleLeft:
 	pusha
 	
@@ -148,7 +149,9 @@ movePaddleLeft:
 	cmp word [cs:isPlayerBTurn], 1	;here move playerB paddle in 24th row Left by 1 cell
 	je moveBLeft
 	jmp endF
-moveALeft:	
+	
+	
+moveBLeft:	
 	mov ax, 0xb800
 	mov es, ax
 	mov di, 3840
@@ -168,7 +171,7 @@ moveLeft1:
 	jmp endF
 
 	
-moveBLeft:
+moveALeft:
 	mov ax, 0xb800
 	mov es, ax
 	mov di, 0
@@ -200,7 +203,7 @@ movePaddleRight:
 	je movBRight
 	jmp endFr
 	
-movBRight:
+movARight:
 	mov ax, 0xb800
 	mov es, ax
 	mov di, 158
@@ -220,7 +223,7 @@ movRight2:
 	
 	jmp endFr
 	
-movARight:
+movBRight:
 	mov ax, 0xb800
 	mov es, ax
 	mov di, 3998
@@ -327,32 +330,25 @@ drawScreen:
 	rep stosw
 	
 showBall:
-	;drawing PlayerB Paddle
-	mov ax, 40 ; x position
-	mov bx, 23 ;y position
-	push ax
-	push bx
-	call getScreenLocation
-	mov di, ax
-	mov word [cs:ballLocation], di
+
+	mov word di, [cs:ballLocation]
 	mov word [es:di], 0x072A
-	rep stosw
 	popa
-	ret
-	
+	ret 
 	
 ; depending upon position set which player's turn it is 
 setTurns:
 	cmp word [cs:ballDirection], 2
-	je setBTurn
+	je setATurn
 	cmp word [cs:ballDirection], 1
-	je setBTurn
+	je setATurn
 	cmp word [cs:ballDirection], 4
-	je setATurn
+	je setBTurn
 	cmp word [cs:ballDirection], 3
-	je setATurn
+	je setBTurn
 	
 	jmp return
+	
 setBTurn:
 	mov word [cs:isPlayerBTurn], 1
 	mov word [cs:isPlayerATurn], 0
@@ -503,8 +499,8 @@ moveDownLeftPortal:
 moveDownRight:
 	mov word [cs:ballDirection], 3
 	
-	mov word [cs:isPlayerATurn], 1
-	mov word [cs:isPlayerBTurn], 0
+	mov word [cs:isPlayerBTurn], 1
+	mov word [cs:isPlayerATurn], 0
 	mov di, [cs:ballLocation]
 	mov word [es:di], 0x0720
 	call setNextLocation
@@ -522,8 +518,8 @@ moveDownRight:
 moveDownLeft:
 	mov word [cs:ballDirection], 4
 	
-	mov word [cs:isPlayerATurn], 1
-	mov word [cs:isPlayerBTurn], 0
+	mov word [cs:isPlayerBTurn], 1
+	mov word [cs:isPlayerATurn], 0
 	mov di, [cs:ballLocation]
 	mov word [es:di], 0x0720
 	call setNextLocation
@@ -542,8 +538,8 @@ moveDownLeft:
 	
 upRight:
 	mov word [cs:ballDirection], 1
-	mov word [cs:isPlayerBTurn], 1
-	mov word [cs:isPlayerATurn], 0
+	mov word [cs:isPlayerATurn], 1
+	mov word [cs:isPlayerBTurn], 0
 	
 	mov di, [cs:ballLocation]
 	mov word [es:di], 0x0720
@@ -560,8 +556,8 @@ upRight:
 	
 upLeft:
 	mov word [cs:ballDirection], 2	
-	mov word [cs:isPlayerBTurn], 1
-	mov word [cs:isPlayerATurn], 0
+	mov word [cs:isPlayerATurn], 1
+	mov word [cs:isPlayerBTurn], 0
 	
 	mov di, [cs:ballLocation]
 	mov word [es:di], 0x0720
@@ -593,13 +589,23 @@ printScore:
 	
 	mov bh, 0x07
 	mov dh, 0x07
+	
 	cmp word [cs:isPlayerATurn], 1
 	je addBScore
 	cmp word [cs:isPlayerBTurn], 1
 	je addAScore
 	jmp retScore
 	
+	
+	
+	
 addAScore:
+	mov word [cs:ballLocation], 240
+	mov word [cs:isPlayerATurn], 0
+	mov word [cs:isPlayerBTurn], 1
+	mov word [cs:ballDirection], 3
+
+
 	mov bh, 0x0C
 	inc word [cs:playerAScore]
 	mov al, [cs:playerAScore]
@@ -608,6 +614,11 @@ addAScore:
 	je endAWon
 	jmp showScore
 addBScore:
+	mov word [cs:ballLocation], 3760 ; 200
+	mov word [cs:isPlayerATurn], 1
+	mov word [cs:isPlayerBTurn], 0
+	mov word [cs:ballDirection], 1
+	
 	mov dh, 0x0C
 	inc word [cs:playerBScore]
 	mov al, [cs:playerBScore]
@@ -626,12 +637,7 @@ endBWon:
 
 showScore:
 	mov di, [cs:ballLocation]
-	mov word [es:di], 0x0720
-	mov word [cs:ballLocation], 3760
-	mov word [cs:isPlayerATurn], 0
-	mov word [cs:isPlayerBTurn], 1
-	
-	mov word [cs:ballDirection], 1
+	mov word [es:di], 0x0720	
 	
 	mov ax, 31; column(x)
 	push ax
@@ -680,12 +686,10 @@ showScoretxtA:
 	mov ax, 13; row (y)
 	push ax
 	call getScreenLocation
-	mov di, ax
-	
+	mov di, ax	
 
 	;here print Player B: 
-	mov cx, 10
-	
+	mov cx, 10	
 	mov si, pB
 showScoretxtB:
 	mov ah, dh
